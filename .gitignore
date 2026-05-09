@@ -1,0 +1,11 @@
+.next
+node_modules
+.env
+.env.local
+.env.production
+coverage
+dist
+*.log
+DB credentials.txt
+Important Details for JDJ3LLC.txt
+next-app/

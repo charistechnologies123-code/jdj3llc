@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                String        @id @default(cuid())
+  name              String
+  email             String        @unique
+  phoneNumber       String?
+  avatarPath        String?
+  passwordHash      String?
+  referralCode      String?       @unique
+  referredByUserId  String?
+  role              UserRole      @default(CUSTOMER)
+  lastSeenAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  addresses         Address[]
+  createdCoupons    Coupon[]      @relation("CouponCreator")
+  couponUsage       CouponUsage[]
+  referredOrders    Order[]       @relation("OrderReferrer")
+  orders            Order[]
+  referralsReceived Referral[]    @relation("ReferralReferredUser")
+  referralsMade     Referral[]    @relation("ReferralOwner")
+  reviews           Review[]
+  referrer          User?         @relation("UserReferrals", fields: [referredByUserId], references: [id])
+  referredUsers     User[]        @relation("UserReferrals")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id                String         @id @default(cuid())
+  categoryId        String?
+  name              String
+  slug              String         @unique
+  sku               String?        @unique
+  summary           String?
+  description       String
+  quantity          Int            @default(0)
+  requestPriceLabel String         @default("Request Price")
+  isActive          Boolean        @default(true)
+  isFeatured        Boolean        @default(false)
+  metaTitle         String?
+  metaDescription   String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  orderItems        OrderItem[]
+  category          Category?      @relation(fields: [categoryId], references: [id])
+  images            ProductImage[]
+  reviews           Review[]
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  path      String
+  altText   String?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Address {
+  id            String   @id @default(cuid())
+  userId        String
+  label         String?
+  recipientName String
+  phoneNumber   String
+  addressLine1  String
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  country       String   @default("USA")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders        Order[]
+}
+
+model Coupon {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  description     String?
+  usageLimit      Int?
+  expiresAt       DateTime?
+  isActive        Boolean       @default(true)
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdBy       User?         @relation("CouponCreator", fields: [createdByUserId], references: [id])
+  usage           CouponUsage[]
+  orders          Order[]
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  userId            String?
+  addressId         String?
+  couponId          String?
+  referredByUserId  String?
+  orderNumber       String        @unique
+  status            OrderStatus   @default(SUBMITTED)
+  userType          String        @default("guest")
+  customerName      String
+  customerEmail     String
+  customerPhone     String
+  deliveryAddress   String
+  couponCode        String?
+  referralCode      String?
+  notes             String?
+  finalPrice        Decimal?      @db.Decimal(10, 2)
+  adminDiscountNote String?
+  contactedAt       DateTime?
+  submittedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  couponUsage       CouponUsage[]
+  address           Address?      @relation(fields: [addressId], references: [id])
+  coupon            Coupon?       @relation(fields: [couponId], references: [id])
+  referredByUser    User?         @relation("OrderReferrer", fields: [referredByUserId], references: [id])
+  user              User?         @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+  referrals         Referral[]
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  productId    String?
+  productName  String
+  productSlug  String?
+  productImage String?
+  quantity     Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id])
+}
+
+model CouponUsage {
+  id        String   @id @default(cuid())
+  couponId  String
+  userId    String
+  orderId   String?
+  usedAt    DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  order     Order?   @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId])
+}
+
+model Review {
+  id           String       @id @default(cuid())
+  productId    String
+  userId       String?
+  customerName String
+  rating       Int
+  review       String
+  status       ReviewStatus @default(PENDING)
+  approvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  message   String
+  imagePath String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Referral {
+  id             String         @id @default(cuid())
+  userId         String
+  referredUserId String?
+  orderId        String?
+  referralCode   String
+  status         ReferralStatus @default(REGISTERED)
+  convertedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  order          Order?         @relation(fields: [orderId], references: [id])
+  referredUser   User?          @relation("ReferralReferredUser", fields: [referredUserId], references: [id])
+  user           User           @relation("ReferralOwner", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  SUBMITTED
+  CONTACTED
+  CANCELLED
+  FULFILLED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReferralStatus {
+  REGISTERED
+  ORDERED
+}
