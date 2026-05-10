@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type Coupon = {
   id: string;
@@ -27,6 +30,8 @@ export function AdminCouponsManager({ initialCoupons }: { initialCoupons: Coupon
   const blank = useMemo<FormState>(() => ({ code: "", usageLimit: "", description: "", expiresAt: "", isActive: true }), []);
   const [form, setForm] = useState<FormState>(blank);
   const [message, setMessage] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Coupon | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function saveCoupon() {
     const response = await fetch(form.id ? `/api/admin/coupons/${form.id}` : "/api/admin/coupons", {
@@ -50,10 +55,18 @@ export function AdminCouponsManager({ initialCoupons }: { initialCoupons: Coupon
   }
 
   async function deleteCoupon(id: string) {
+    setDeleting(true);
     const response = await fetch(`/api/admin/coupons/${id}`, { method: "DELETE", credentials: "same-origin" });
     const payload = (await response.json()) as { message?: string };
     setMessage(payload.message ?? (response.ok ? "Coupon deleted." : "Unable to delete coupon."));
-    if (response.ok) router.refresh();
+    if (response.ok) {
+      toast.success("Coupon deleted successfully.");
+      router.refresh();
+    } else {
+      toast.error(payload.message ?? "Unable to delete coupon.");
+    }
+    setDeleting(false);
+    setPendingDelete(null);
   }
 
   return (
@@ -92,12 +105,23 @@ export function AdminCouponsManager({ initialCoupons }: { initialCoupons: Coupon
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setForm({ id: coupon.id, code: coupon.code, usageLimit: coupon.usageLimit?.toString() ?? "", description: coupon.description ?? "", expiresAt: coupon.expiresAt ? new Date(coupon.expiresAt).toISOString().slice(0, 16) : "", isActive: coupon.isActive })} className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold">Edit</button>
-                <button type="button" onClick={() => { void deleteCoupon(coupon.id); }} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">Delete</button>
+                <button type="button" onClick={() => setPendingDelete(coupon)} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">Delete</button>
               </div>
             </div>
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete coupon?"
+        description={`This will permanently remove coupon ${pendingDelete?.code ?? ""}.`}
+        confirmLabel="Delete coupon"
+        busy={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void deleteCoupon(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

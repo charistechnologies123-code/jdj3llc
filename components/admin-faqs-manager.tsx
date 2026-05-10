@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
+
 type FaqItem = {
   id: string;
   question: string;
@@ -25,6 +27,8 @@ export function AdminFaqsManager({ initialFaqs }: { initialFaqs: FaqItem[] }) {
   const blank = useMemo<FormState>(() => ({ question: "", answer: "", isActive: true, sortOrder: 0 }), []);
   const [form, setForm] = useState<FormState>(blank);
   const [message, setMessage] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<FaqItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function saveFaq() {
     const endpoint = form.id ? `/api/admin/faqs/${form.id}` : "/api/admin/faqs";
@@ -51,6 +55,7 @@ export function AdminFaqsManager({ initialFaqs }: { initialFaqs: FaqItem[] }) {
   }
 
   async function deleteFaq(id: string) {
+    setDeleting(true);
     const response = await fetch(`/api/admin/faqs/${id}`, {
       method: "DELETE",
       credentials: "same-origin",
@@ -70,6 +75,8 @@ export function AdminFaqsManager({ initialFaqs }: { initialFaqs: FaqItem[] }) {
       setForm(blank);
     }
     router.refresh();
+    setDeleting(false);
+    setPendingDelete(null);
   }
 
   return (
@@ -146,7 +153,7 @@ export function AdminFaqsManager({ initialFaqs }: { initialFaqs: FaqItem[] }) {
                 >
                   Edit
                 </button>
-                <button type="button" onClick={() => { void deleteFaq(faq.id); }} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
+                <button type="button" onClick={() => setPendingDelete(faq)} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
                   Delete
                 </button>
               </div>
@@ -154,6 +161,17 @@ export function AdminFaqsManager({ initialFaqs }: { initialFaqs: FaqItem[] }) {
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete FAQ?"
+        description={`This will permanently remove "${pendingDelete?.question ?? "this FAQ"}".`}
+        confirmLabel="Delete FAQ"
+        busy={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void deleteFaq(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

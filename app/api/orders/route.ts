@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { sendOrderEmails } from "@/lib/email";
 import { getSessionFromCookies } from "@/lib/session";
 
 const orderSchema = z.object({
@@ -276,7 +277,23 @@ export async function POST(request: Request) {
           }),
         },
       },
-      select: { id: true, orderNumber: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        customerName: true,
+        customerEmail: true,
+        customerPhone: true,
+        deliveryAddress: true,
+        couponCode: true,
+        notes: true,
+        userType: true,
+        items: {
+          select: {
+            productName: true,
+            quantity: true,
+          },
+        },
+      },
     });
 
     if (user && coupon) {
@@ -305,6 +322,10 @@ export async function POST(request: Request) {
     }
 
     return createdOrder;
+  });
+
+  void sendOrderEmails(order).catch((error) => {
+    console.error("Order saved but email sending failed.", error);
   });
 
   return Response.json({

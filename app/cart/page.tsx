@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAuth } from "@/components/auth-provider";
 import { useCart } from "@/components/cart-provider";
 import { isGuestCheckoutEnabled } from "@/lib/client-checkout";
@@ -11,6 +13,7 @@ export default function CartPage() {
   const { items, updateItem, removeItem } = useCart();
   const { user, ready } = useAuth();
   const canGoStraightToCheckout = Boolean(user) || (ready && isGuestCheckoutEnabled());
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -51,10 +54,7 @@ export default function CartPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      removeItem(item.id);
-                      toast.success(`${item.name} removed from cart.`);
-                    }}
+                    onClick={() => setPendingRemove({ id: item.id, name: item.name })}
                     className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                   >
                     Remove
@@ -78,6 +78,19 @@ export default function CartPage() {
           </div>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingRemove)}
+        title="Remove item from cart?"
+        description={`This will remove ${pendingRemove?.name ?? "this item"} from your cart.`}
+        confirmLabel="Remove item"
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={() => {
+          if (!pendingRemove) return;
+          removeItem(pendingRemove.id);
+          toast.success(`${pendingRemove.name} removed from cart.`);
+          setPendingRemove(null);
+        }}
+      />
     </main>
   );
 }

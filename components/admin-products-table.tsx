@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
+
 type ProductRow = {
   id: string;
   name: string;
@@ -16,8 +18,11 @@ type ProductRow = {
 export function AdminProductsTable({ products }: { products: ProductRow[] }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<ProductRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function removeProduct(id: string) {
+    setDeleting(true);
     const response = await fetch(`/api/admin/products/${id}`, {
       method: "DELETE",
       credentials: "same-origin",
@@ -30,6 +35,8 @@ export function AdminProductsTable({ products }: { products: ProductRow[] }) {
     } else {
       toast.error(payload.message ?? "Unable to delete product.");
     }
+    setDeleting(false);
+    setPendingDelete(null);
   }
 
   return (
@@ -52,9 +59,7 @@ export function AdminProductsTable({ products }: { products: ProductRow[] }) {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => {
-                      void removeProduct(product.id);
-                    }}
+                    onClick={() => setPendingDelete(product)}
                     className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
                   >
                     Delete
@@ -66,6 +71,17 @@ export function AdminProductsTable({ products }: { products: ProductRow[] }) {
         </tbody>
       </table>
       {message ? <p className="px-6 py-4 text-sm text-slate-600">{message}</p> : null}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete product?"
+        description={`This will permanently remove ${pendingDelete?.name ?? "this product"} from the catalog.`}
+        confirmLabel="Delete product"
+        busy={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void removeProduct(pendingDelete.id);
+        }}
+      />
     </>
   );
 }

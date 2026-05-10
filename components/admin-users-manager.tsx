@@ -4,6 +4,7 @@ import { UserRole } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAuth } from "@/components/auth-provider";
 
 type UserRow = {
@@ -28,6 +29,8 @@ export function AdminUsersManager({ initialUsers }: { initialUsers: UserRow[] })
   const blank = useMemo<FormState>(() => ({ name: "", email: "", password: "", role: UserRole.ADMIN }), []);
   const [form, setForm] = useState<FormState>(blank);
   const [message, setMessage] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function saveUser() {
     const response = await fetch(form.id ? `/api/admin/users/${form.id}` : "/api/admin/users", {
@@ -45,6 +48,7 @@ export function AdminUsersManager({ initialUsers }: { initialUsers: UserRow[] })
   }
 
   async function deleteUser(id: string) {
+    setDeleting(true);
     const response = await fetch(`/api/admin/users/${id}`, {
       method: "DELETE",
       credentials: "same-origin",
@@ -52,6 +56,8 @@ export function AdminUsersManager({ initialUsers }: { initialUsers: UserRow[] })
     const payload = (await response.json()) as { message?: string };
     setMessage(payload.message ?? (response.ok ? "User deleted." : "Unable to delete user."));
     if (response.ok) router.refresh();
+    setDeleting(false);
+    setPendingDelete(null);
   }
 
   return (
@@ -93,9 +99,7 @@ export function AdminUsersManager({ initialUsers }: { initialUsers: UserRow[] })
                     <button
                       type="button"
                       disabled={user?.id === entry.id}
-                      onClick={() => {
-                        void deleteUser(entry.id);
-                      }}
+                      onClick={() => setPendingDelete(entry)}
                       className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Delete
@@ -107,6 +111,17 @@ export function AdminUsersManager({ initialUsers }: { initialUsers: UserRow[] })
           </tbody>
         </table>
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete user?"
+        description={`This will permanently remove ${pendingDelete?.name ?? "this user"} and related account data.`}
+        confirmLabel="Delete user"
+        busy={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void deleteUser(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

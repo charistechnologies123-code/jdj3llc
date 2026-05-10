@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { UploadedImageField } from "@/components/uploaded-image-field";
 
 type Testimonial = {
@@ -26,6 +28,8 @@ export function AdminTestimonialsManager({ initialTestimonials }: { initialTesti
   const blank = useMemo<FormState>(() => ({ name: "", message: "", imagePath: "", isActive: true }), []);
   const [form, setForm] = useState<FormState>(blank);
   const [message, setMessage] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Testimonial | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function saveTestimonial() {
     const endpoint = form.id ? `/api/admin/testimonials/${form.id}` : "/api/admin/testimonials";
@@ -45,6 +49,7 @@ export function AdminTestimonialsManager({ initialTestimonials }: { initialTesti
   }
 
   async function deleteTestimonial(id: string) {
+    setDeleting(true);
     const response = await fetch(`/api/admin/testimonials/${id}`, {
       method: "DELETE",
       credentials: "same-origin",
@@ -52,8 +57,13 @@ export function AdminTestimonialsManager({ initialTestimonials }: { initialTesti
     const payload = (await response.json()) as { message?: string };
     setMessage(payload.message ?? (response.ok ? "Testimonial deleted." : "Unable to delete testimonial."));
     if (response.ok) {
+      toast.success("Testimonial deleted successfully.");
       router.refresh();
+    } else {
+      toast.error(payload.message ?? "Unable to delete testimonial.");
     }
+    setDeleting(false);
+    setPendingDelete(null);
   }
 
   return (
@@ -99,12 +109,23 @@ export function AdminTestimonialsManager({ initialTestimonials }: { initialTesti
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setForm({ id: testimonial.id, name: testimonial.name, message: testimonial.message, imagePath: testimonial.imagePath ?? "", isActive: testimonial.isActive })} className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold">Edit</button>
-                <button type="button" onClick={() => { void deleteTestimonial(testimonial.id); }} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">Delete</button>
+                <button type="button" onClick={() => setPendingDelete(testimonial)} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">Delete</button>
               </div>
             </div>
           </div>
         )) : null}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete testimonial?"
+        description={`This will permanently remove the testimonial from ${pendingDelete?.name ?? "this customer"}.`}
+        confirmLabel="Delete testimonial"
+        busy={deleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void deleteTestimonial(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

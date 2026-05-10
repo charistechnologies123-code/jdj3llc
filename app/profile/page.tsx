@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAuth } from "@/components/auth-provider";
 
 export default function ProfilePage() {
@@ -12,6 +13,9 @@ export default function ProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [addressMessage, setAddressMessage] = useState("");
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<string | null>(null);
+  const [pendingDeleteAddressLabel, setPendingDeleteAddressLabel] = useState("");
+  const [deletingAddress, setDeletingAddress] = useState(false);
 
   useEffect(() => {
     if (ready && (!user || user.role !== "CUSTOMER")) {
@@ -205,16 +209,9 @@ export default function ProfilePage() {
                         ) : null}
                         <button
                           type="button"
-                          onClick={async () => {
-                            const result = await deleteAddress(address.id);
-                            setAddressMessage(
-                              result.message ?? (result.ok ? "Address deleted." : "Unable to delete address."),
-                            );
-                            if (result.ok) {
-                              toast.success("Delivery address deleted.");
-                            } else {
-                              toast.error(result.message ?? "Unable to delete address.");
-                            }
+                          onClick={() => {
+                            setPendingDeleteAddressId(address.id);
+                            setPendingDeleteAddressLabel(address.label || address.recipientName || "this address");
                           }}
                           className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white"
                         >
@@ -265,6 +262,32 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDeleteAddressId)}
+        title="Delete delivery address?"
+        description={`This will remove ${pendingDeleteAddressLabel} from your saved addresses.`}
+        confirmLabel="Delete address"
+        busy={deletingAddress}
+        onCancel={() => {
+          setPendingDeleteAddressId(null);
+          setPendingDeleteAddressLabel("");
+        }}
+        onConfirm={() => {
+          if (!pendingDeleteAddressId) return;
+          setDeletingAddress(true);
+          void deleteAddress(pendingDeleteAddressId).then((result) => {
+            setAddressMessage(result.message ?? (result.ok ? "Address deleted." : "Unable to delete address."));
+            if (result.ok) {
+              toast.success("Delivery address deleted.");
+            } else {
+              toast.error(result.message ?? "Unable to delete address.");
+            }
+            setDeletingAddress(false);
+            setPendingDeleteAddressId(null);
+            setPendingDeleteAddressLabel("");
+          });
+        }}
+      />
     </main>
   );
 }
