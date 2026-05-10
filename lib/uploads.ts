@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { put } from "@vercel/blob";
 
 import { ACCEPTED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/upload-config";
 
@@ -20,12 +20,13 @@ export async function storeUploadedImage(file: File, folder: string) {
   const extension = extname(file.name || "").toLowerCase() || ".jpg";
   const safeFolder = folder.replace(/[^a-zA-Z0-9/-]/g, "");
   const fileName = `${randomUUID()}${extension}`;
-  const diskFolder = join(process.cwd(), "public", "uploads", safeFolder);
-  const diskPath = join(diskFolder, fileName);
+  const blobPath = join(safeFolder, fileName).replace(/\\/g, "/");
 
-  await mkdir(diskFolder, { recursive: true });
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(diskPath, bytes);
+  const blob = await put(blobPath, file, {
+    access: "public",
+    contentType: file.type || undefined,
+    addRandomSuffix: false,
+  });
 
-  return `/uploads/${safeFolder}/${fileName}`;
+  return blob.url;
 }
