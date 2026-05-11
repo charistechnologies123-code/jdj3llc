@@ -324,12 +324,23 @@ export async function POST(request: Request) {
     return createdOrder;
   });
 
-  void sendOrderEmails(order).catch((error) => {
+  let emailResult;
+  try {
+    emailResult = await sendOrderEmails(order);
+  } catch (error) {
     console.error("Order saved but email sending failed.", error);
-  });
+    emailResult = {
+      configured: true,
+      customerSent: false,
+      organizationSent: false,
+      allSent: false,
+      errors: [error instanceof Error ? error.message : "Unable to send order emails."],
+    };
+  }
 
   return Response.json({
     ok: true,
     orderNumber: order.orderNumber,
+    email: emailResult,
   });
 }

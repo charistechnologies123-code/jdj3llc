@@ -18,6 +18,14 @@ type OrderEmailPayload = {
   items: OrderEmailItem[];
 };
 
+export type OrderEmailResult = {
+  configured: boolean;
+  customerSent: boolean;
+  organizationSent: boolean;
+  allSent: boolean;
+  errors: string[];
+};
+
 const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
@@ -166,10 +174,16 @@ function getEmailConfig() {
   return { from, organizationTo };
 }
 
-export async function sendOrderEmails(order: OrderEmailPayload) {
+export async function sendOrderEmails(order: OrderEmailPayload): Promise<OrderEmailResult> {
   if (!resend) {
     console.warn("Resend is not configured. Skipping order emails.");
-    return;
+    return {
+      configured: false,
+      customerSent: false,
+      organizationSent: false,
+      allSent: false,
+      errors: ["Resend is not configured."],
+    };
   }
 
   const { from, organizationTo } = getEmailConfig();
@@ -193,15 +207,35 @@ export async function sendOrderEmails(order: OrderEmailPayload) {
   ];
 
   const results = await Promise.allSettled(jobs);
+  const errors: string[] = [];
+  const customerResult = results[0];
+  const organizationResult = results[1];
+
+  const customerSent =
+    customerResult?.status === "fulfilled" && !customerResult.value.error;
+  const organizationSent =
+    organizationResult?.status === "fulfilled" && !organizationResult.value.error;
 
   for (const result of results) {
     if (result.status === "rejected") {
       console.error("Failed to send order email.", result.reason);
+      errors.push(
+        result.reason instanceof Error ? result.reason.message : "Order email request failed.",
+      );
       continue;
     }
 
     if (result.value.error) {
       console.error("Failed to send order email.", result.value.error);
+      errors.push(result.value.error.message || "Order email request failed.");
     }
   }
+
+  return {
+    configured: true,
+    customerSent,
+    organizationSent,
+    allSent: customerSent && organizationSent,
+    errors,
+  };
 }
