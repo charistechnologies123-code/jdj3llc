@@ -90,6 +90,19 @@ export async function POST(request: Request) {
   }
 
   const productMap = new Map(products.map((product) => [product.id, product]));
+  const unavailableItem = data.items.find((item) => {
+    const product = productMap.get(item.id);
+    return !product || product.quantity < item.quantity;
+  });
+
+  if (unavailableItem) {
+    const product = productMap.get(unavailableItem.id);
+    const productName = product?.name ?? "One of the selected products";
+    return Response.json(
+      { message: `${productName} does not have enough quantity available for this order.` },
+      { status: 409 },
+    );
+  }
   const coupon = data.couponCode
     ? await db.coupon.findFirst({
         where: {
@@ -231,98 +244,131 @@ export async function POST(request: Request) {
     return Response.json({ message: "Please choose a delivery address for this order." }, { status: 400 });
   }
 
-  const order = await db.$transaction(async (tx) => {
-    if (user && addressForSave?.isDefault) {
-      await tx.address.updateMany({
-        where: { userId: user.id, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+  let order;
+  try {
+    order = await db.$transaction(async (tx) => {
+      for (const item of data.items) {
+        const stockUpdate = await tx.product.updateMany({
+          where: {
+            id: item.id,
+            quantity: {
+              gte: item.quantity,
+            },
+          },
+          data: {
+            quantity: {
+              decrement: item.quantity,
+            },
+          },
+        });
 
-    if (user && addressForSave && data.saveAddress) {
-      await tx.address.create({
+        if (stockUpdate.count === 0) {
+          const product = productMap.get(item.id);
+          throw new Error(
+            `${product?.name ?? "One of the selected products"} is no longer available in the requested quantity.`,
+          );
+        }
+      }
+
+      if (user && addressForSave?.isDefault) {
+        await tx.address.updateMany({
+          where: { userId: user.id, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      if (user && addressForSave && data.saveAddress) {
+        await tx.address.create({
+          data: {
+            userId: user.id,
+            ...addressForSave,
+          },
+        });
+      }
+
+      const createdOrder = await tx.order.create({
         data: {
-          userId: user.id,
-          ...addressForSave,
-        },
-      });
-    }
-
-    const createdOrder = await tx.order.create({
-      data: {
-        userId: user?.id ?? null,
-        addressId: user && data.addressId ? data.addressId : null,
-        referredByUserId: user?.referredByUserId ?? null,
-        couponId: coupon?.id ?? null,
-        orderNumber: buildOrderNumber(),
-        userType: user ? "registered" : "guest",
-        customerName,
-        customerEmail,
-        customerPhone,
-        deliveryAddress,
-        couponCode: coupon?.code ?? null,
-        referralCode: user?.referralCode ?? null,
-        notes: data.notes,
-        submittedAt: new Date(),
-        items: {
-          create: data.items.map((item) => {
-            const product = productMap.get(item.id)!;
-            return {
-              productId: product.id,
-              productName: product.name,
-              productSlug: product.slug,
-              productImage: product.images[0]?.path ?? null,
-              quantity: item.quantity,
-            };
-          }),
-        },
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        customerName: true,
-        customerEmail: true,
-        customerPhone: true,
-        deliveryAddress: true,
-        couponCode: true,
-        notes: true,
-        userType: true,
-        items: {
-          select: {
-            productName: true,
-            quantity: true,
+          userId: user?.id ?? null,
+          addressId: user && data.addressId ? data.addressId : null,
+          referredByUserId: user?.referredByUserId ?? null,
+          couponId: coupon?.id ?? null,
+          orderNumber: buildOrderNumber(),
+          userType: user ? "registered" : "guest",
+          customerName,
+          customerEmail,
+          customerPhone,
+          deliveryAddress,
+          couponCode: coupon?.code ?? null,
+          referralCode: user?.referralCode ?? null,
+          notes: data.notes,
+          submittedAt: new Date(),
+          items: {
+            create: data.items.map((item) => {
+              const product = productMap.get(item.id)!;
+              return {
+                productId: product.id,
+                productName: product.name,
+                productSlug: product.slug,
+                productImage: product.images[0]?.path ?? null,
+                quantity: item.quantity,
+              };
+            }),
           },
         },
-      },
+        select: {
+          id: true,
+          orderNumber: true,
+          customerName: true,
+          customerEmail: true,
+          customerPhone: true,
+          deliveryAddress: true,
+          couponCode: true,
+          notes: true,
+          userType: true,
+          items: {
+            select: {
+              productName: true,
+              quantity: true,
+            },
+          },
+        },
+      });
+
+      if (user && coupon) {
+        await tx.couponUsage.create({
+          data: {
+            couponId: coupon.id,
+            userId: user.id,
+            orderId: createdOrder.id,
+            usedAt: new Date(),
+          },
+        });
+      }
+
+      if (user?.referredByUserId) {
+        await tx.referral.updateMany({
+          where: {
+            userId: user.referredByUserId,
+            referredUserId: user.id,
+          },
+          data: {
+            orderId: createdOrder.id,
+            status: "ORDERED",
+            convertedAt: new Date(),
+          },
+        });
+      }
+
+      return createdOrder;
     });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "One or more products could not be reserved for this order.";
 
-    if (user && coupon) {
-      await tx.couponUsage.create({
-        data: {
-          couponId: coupon.id,
-          userId: user.id,
-          orderId: createdOrder.id,
-          usedAt: new Date(),
-        },
-      });
-    }
-
-    if (user?.referredByUserId) {
-      await tx.referral.updateMany({
-        where: {
-          userId: user.referredByUserId,
-          referredUserId: user.id,
-        },
-        data: {
-          orderId: createdOrder.id,
-          status: "ORDERED",
-          convertedAt: new Date(),
-        },
-      });
-    }
-
-    return createdOrder;
-  });
+    return Response.json({ message }, { status: 409 });
+  }
 
   let emailResult;
   try {

@@ -217,7 +217,7 @@ export default function CheckoutPage() {
         <div className="rounded-[2rem] border border-orange-100 bg-white p-8 shadow-sm">
           <h1 className="text-3xl font-black">Order request received</h1>
           <p className="mt-4 text-sm leading-7 text-slate-600">
-            We have saved your order request to JDJ3. The team will review it and follow up by
+            We have received your order. The team will review it and follow up by
             WhatsApp or email with final pricing and payment instructions.
           </p>
           {orderNumber ? (

@@ -142,20 +142,39 @@ export function StoreHeader() {
       </div>
 
       {open ? (
-        <div className="border-t border-slate-200 px-4 py-4 md:hidden">
+        <div className="border-t border-slate-200 bg-stone-50 px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-3 text-sm font-semibold text-slate-700">
             {links.map((link) => (
-              <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className="transition hover:text-orange-600">
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.99]"
+              >
                 {link.label}
+                <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Open</span>
               </Link>
             ))}
-            <Link href="/cart" onClick={() => setOpen(false)} className="transition hover:text-orange-600">
+            <div className="my-1 h-px bg-slate-200" />
+            <Link
+              href="/cart"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.99]"
+            >
               Cart ({itemCount})
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-orange-600">
+                {itemCount}
+              </span>
             </Link>
             {user ? (
               <>
-                <Link href={user.role === "ADMIN" ? "/admin" : "/profile"} onClick={() => setOpen(false)} className="transition hover:text-orange-600">
+                <Link
+                  href={user.role === "ADMIN" ? "/admin" : "/profile"}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.99]"
+                >
                   {user.role === "ADMIN" ? "Admin Portal" : "Profile"}
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Open</span>
                 </Link>
                 <button
                   type="button"
@@ -163,14 +182,20 @@ export function StoreHeader() {
                     void logout();
                     setOpen(false);
                   }}
-                  className="text-left"
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.99]"
                 >
                   Log out
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Exit</span>
                 </button>
               </>
             ) : (
-              <Link href="/login" onClick={() => setOpen(false)} className="transition hover:text-orange-600">
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.99]"
+              >
                 Login
+                <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Open</span>
               </Link>
             )}
           </nav>
