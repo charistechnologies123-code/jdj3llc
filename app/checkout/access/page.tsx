@@ -2,11 +2,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
+import { useAuth } from "@/components/auth-provider";
 import { enableGuestCheckout } from "@/lib/client-checkout";
+import { isGuestCheckoutEnabled } from "@/lib/client-checkout";
 
 export default function CheckoutAccessPage() {
   const router = useRouter();
+  const { user, ready } = useAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    if (user || isGuestCheckoutEnabled()) {
+      router.replace("/checkout");
+    }
+  }, [ready, router, user]);
+
+  if (!ready) {
+    return null;
+  }
+
+  if (user || isGuestCheckoutEnabled()) {
+    return null;
+  }
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">

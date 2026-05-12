@@ -25,19 +25,6 @@ type CheckoutFormState = {
   setDefaultAddress: boolean;
 };
 
-type CheckoutResponse = {
-  ok?: boolean;
-  message?: string;
-  orderNumber?: string;
-  email?: {
-    configured: boolean;
-    customerSent: boolean;
-    organizationSent: boolean;
-    allSent: boolean;
-    errors: string[];
-  };
-};
-
 const emptyAddressState = {
   label: "",
   addressLine1: "",
@@ -54,7 +41,6 @@ export default function CheckoutPage() {
   const { user, ready, refreshAccount } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [emailStatusMessage, setEmailStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [guestMode, setGuestMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,7 +183,7 @@ export default function CheckoutPage() {
         credentials: "same-origin",
         body: JSON.stringify(payload),
       });
-      const payloadResponse = (await response.json()) as CheckoutResponse;
+      const payloadResponse = (await response.json()) as { ok?: boolean; message?: string; orderNumber?: string };
 
       if (!response.ok) {
         const message = payloadResponse.message ?? "Unable to submit your order request.";
@@ -207,24 +193,11 @@ export default function CheckoutPage() {
       }
 
       setOrderNumber(payloadResponse.orderNumber ?? "");
-      const emailResult = payloadResponse.email;
-      const emailMessage = emailResult?.allSent
-        ? "Success - order saved and both confirmation emails were sent."
-        : emailResult?.configured
-          ? "Order saved, but one or more confirmation emails could not be sent."
-          : "Order saved, but email sending is not configured yet.";
-
-      setEmailStatusMessage(emailMessage);
       setSubmitted(true);
       clearCart();
       clearGuestCheckout();
       await refreshAccount();
-
-      if (emailResult?.allSent) {
-        toast.success(emailMessage);
-      } else {
-        toast.error(emailMessage);
-      }
+      toast.success("Your order has been placed, you will receive an email soon and we will contact you for further processing.");
     } finally {
       setIsSubmitting(false);
     }
@@ -247,11 +220,6 @@ export default function CheckoutPage() {
             We have saved your order request to JDJ3. The team will review it and follow up by
             WhatsApp or email with final pricing and payment instructions.
           </p>
-          {emailStatusMessage ? (
-            <p className="mt-5 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-semibold text-slate-800">
-              {emailStatusMessage}
-            </p>
-          ) : null}
           {orderNumber ? (
             <p className="mt-5 rounded-2xl bg-stone-50 px-4 py-3 text-sm font-black text-slate-900">
               Order number: {orderNumber}
